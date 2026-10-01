@@ -68,7 +68,18 @@ class CategoryPostsView(generics.ListAPIView):
 
     def get_queryset(self):
         category = get_object_or_404(Category, slug=self.kwargs['category_slug'])
-        return Post.objects.with_related().published().filter(category=category)
+        return (
+            Post.objects
+            .with_related()
+            .published()
+            .filter(category=category)
+            .annotate(
+                active_comments_count=Count(
+                    'comments',
+                    filter=Q(comments__is_active=True)
+                )
+            )
+        )
 
 
 class PostListCreateView(generics.ListCreateAPIView):
@@ -85,7 +96,17 @@ class PostListCreateView(generics.ListCreateAPIView):
     pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
-        return Post.objects.with_related().visible_to(self.request.user)
+        return (
+            Post.objects
+            .with_related()
+            .visible_to(self.request.user)
+            .annotate(
+                active_comments_count=Count(
+                    'comments',
+                    filter=Q(comments__is_active=True)
+                )
+            )
+        )
 
     def get_serializer_class(self):
         if self.request.method == 'POST':
@@ -105,7 +126,17 @@ class PostDetailView(generics.RetrieveUpdateDestroyAPIView):
     lookup_field = 'slug'
 
     def get_queryset(self):
-        return Post.objects.with_related().visible_to(self.request.user)
+        return (
+            Post.objects
+            .with_related()
+            .visible_to(self.request.user)
+            .annotate(
+                active_comments_count=Count(
+                    'comments',
+                    filter=Q(comments__is_active=True)
+                )
+            )
+        )
 
     def get_serializer_class(self):
         if self.request.method in ('PUT', 'PATCH'):

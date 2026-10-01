@@ -68,31 +68,48 @@ class PostListSerializer(serializers.ModelSerializer):
     author = AuthorSerializer(read_only=True)
     category = CategoryShortSerializer(read_only=True)
     excerpt = serializers.SerializerMethodField()
+    comments_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
         fields = [
             'id', 'title', 'slug', 'excerpt', 'image', 'category',
             'author', 'status', 'created_at', 'updated_at', 'views_count',
+            'comments_count',
         ]
         read_only_fields = fields
 
     def get_excerpt(self, obj):
         return Truncator(obj.content).chars(200)
 
+    def get_comments_count(self, obj):
+        # Если есть аннотация — используем её
+        annotated = getattr(obj, 'active_comments_count', None)
+        if annotated is not None:
+            return annotated
+        return obj.comments.filter(is_active=True).count()
+
 
 class PostDetailSerializer(serializers.ModelSerializer):
     """Сериализатор для детального просмотра поста"""
     author = AuthorSerializer(read_only=True)
     category = CategoryShortSerializer(read_only=True)
+    comments_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
         fields = [
             'id', 'title', 'slug', 'content', 'image', 'category',
             'author', 'status', 'created_at', 'updated_at', 'views_count',
+            'comments_count',
         ]
         read_only_fields = fields
+
+    def get_comments_count(self, obj):
+        annotated = getattr(obj, 'active_comments_count', None)
+        if annotated is not None:
+            return annotated
+        return obj.comments.filter(is_active=True).count()
 
 
 class PostCreateUpdateSerializer(serializers.ModelSerializer):

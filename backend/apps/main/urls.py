@@ -1,4 +1,5 @@
 from django.urls import path
+from ..comments.views import PostCommentsView
 
 from . import views
 
@@ -8,14 +9,19 @@ urlpatterns = [
     path('categories/<slug:slug>/', views.CategoryDetailView.as_view(), name='category-detail'),
     path(
         'categories/<slug:category_slug>/posts/',
-        views.CategoryPostsView.as_view(),
-        name='posts-by-category',
+         views.CategoryPostsView.as_view(),
+         name='posts-by-category'
     ),
 
-    # Posts (специальные пути должны стоять выше <slug:slug>/)
+    # Posts
     path('', views.PostListCreateView.as_view(), name='post-list'),
     path('my-posts/', views.MyPostsView.as_view(), name='my-posts'),
     path('popular/', views.popular_posts, name='popular-posts'),
     path('recent/', views.recent_posts, name='recent-posts'),
+
+    # Комментарии конкретного поста
+    path('<slug:slug>/comments/', PostCommentsView.as_view(), name='post-comments'),
+
+    # Детальный пост (должен быть внизу)
     path('<slug:slug>/', views.PostDetailView.as_view(), name='post-detail'),
 ]

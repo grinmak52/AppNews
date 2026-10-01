@@ -73,6 +73,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     """Сериализатор для профиля пользователя"""
     full_name = serializers.ReadOnlyField()
     posts_count = serializers.SerializerMethodField()
+    comments_count = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -85,6 +86,9 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     def get_posts_count(self, obj):
         return obj.posts.count()
+
+    def get_comments_count(self, obj):
+        return obj.comments.filter(is_active=True).count()
 
 
 class UserUpdateSerializer(serializers.ModelSerializer):
