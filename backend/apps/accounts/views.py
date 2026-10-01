@@ -2,7 +2,7 @@ from rest_framework import status, generics, permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
-from django.contrib.auth import login
+from rest_framework_simplejwt.exceptions import TokenError
 
 from .models import User
 from .serializers import (
@@ -10,7 +10,7 @@ from .serializers import (
     UserLoginSerializer,
     UserProfileSerializer,
     UserUpdateSerializer,
-    ChangePasswordSerializer
+    ChangePasswordSerializer,
 )
 
 
@@ -28,15 +28,15 @@ class RegisterView(generics.CreateAPIView):
         refresh = RefreshToken.for_user(user)
 
         return Response({
-            'user': UserProfileSerializer(user).data,
+            'user': UserProfileSerializer(user, context={'request': request}).data,
             'refresh': str(refresh),
             'access': str(refresh.access_token),
-            'message': 'User registered successfully'
+            'message': 'User registered successfully',
         }, status=status.HTTP_201_CREATED)
 
 
 class LoginView(generics.GenericAPIView):
-    """Вход пользователя"""
+    """Вход пользователя (только JWT, без session)"""
     serializer_class = UserLoginSerializer
     permission_classes = [permissions.AllowAny]
 
@@ -45,62 +45,73 @@ class LoginView(generics.GenericAPIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data['user']
 
-        login(request, user)
         refresh = RefreshToken.for_user(user)
 
         return Response({
-            'user': UserProfileSerializer(user).data,
+            'user': UserProfileSerializer(user, context={'request': request}).data,
             'refresh': str(refresh),
             'access': str(refresh.access_token),
-            'message': 'User login successfully'
+            'message': 'User login successfully',
         }, status=status.HTTP_200_OK)
 
 
 class ProfileView(generics.RetrieveUpdateAPIView):
     """Просмотр и обновление профиля"""
-    serializer_class = UserProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_object(self):
         return self.request.user
 
     def get_serializer_class(self):
-        if self.request.method == 'PUT' or self.request.method == 'PATCH':
+        if self.request.method in ('PUT', 'PATCH'):
             return UserUpdateSerializer
         return UserProfileSerializer
 
 
-class ChangePasswordView(generics.UpdateAPIView):
-    """Смена пароля"""
+class ChangePasswordView(generics.GenericAPIView):
+    """Смена пароля (POST)"""
     serializer_class = ChangePasswordSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-    def get_object(self):
-        return self.request.user
-
-    def update(self, request, *args, **kwargs):
+    def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
 
         return Response({
-            'message': 'Password changed successfully'
+            'message': 'Password changed successfully',
         }, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
 def logout_view(request):
-    """Выход пользователя"""
+    """
+    Выход пользователя — blacklist refresh-токена.
+    Принимает ключ 'refresh' или 'refresh_token'.
+    """
+    refresh_token = request.data.get('refresh') or request.data.get('refresh_token')
+
+    if not refresh_token:
+        return Response(
+            {'error': 'Refresh token is required.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     try:
-        refresh_token = request.data.get('refresh_token')
-        if refresh_token:
-            token = RefreshToken(refresh_token)
-            token.blacklist()
-        return Response({
-            'message': 'Logout successful'
-        }, status=status.HTTP_200_OK)
+        token = RefreshToken(refresh_token)
+        token.blacklist()
+        return Response(
+            {'message': 'Logout successful'},
+            status=status.HTTP_200_OK,
+        )
+    except TokenError:
+        return Response(
+            {'error': 'Invalid or expired token.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
     except Exception:
-        return Response({
-            'error': 'Invalid token'
-        }, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {'error': 'Could not process token.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )

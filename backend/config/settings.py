@@ -24,11 +24,12 @@ THIRD_PARTY_APPS = [
     'corsheaders',
     'django_filters',
     'rest_framework_simplejwt',
+    "rest_framework_simplejwt.token_blacklist"
 ]
 
 LOCAL_APPS = [
     'apps.accounts',
-#     'apps.main',
+    'apps.main',
 #     'apps.comments',
 #     'apps.subscribe',
 #     'apps.payment',
